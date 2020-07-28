@@ -6,7 +6,8 @@ stroking over a reference image.
 Blender minimal tested version: 2.83
 
 ![Example](docs/example.gif "The addon in action")
-A better compressed version can be seen [here](./docs/example.webm).
+
+A better compressed version can be seen [here](https://raw.githubusercontent.com/FrankFirsching/gradient_sampler/master/docs/example.webm).
 
 ## Usage
 
