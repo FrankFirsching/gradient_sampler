@@ -1,6 +1,7 @@
 import bpy
 from . import mss
-from . import ramp
+from . import ramp_utils
+from . import stroke_utils
 
 # An operator, that allows to draw a stroke, which gets sampled into the
 # color ramp.
@@ -78,33 +79,29 @@ class StrokeOperator(bpy.types.Operator):
         # subtract the stroke's coordinates from the overall height
         all_monitors = sct.monitors[0]
         stroke_offset = all_monitors['height']
-        stroke = [(x,stroke_offset-y) for x,y in stroke]
+        stroke = stroke_utils.transformed(stroke, 1, -1, 0, stroke_offset)
         # Optimize the region to capture by the bounding box of the stroke
-        stroke_min_x=min(stroke, key=lambda x:x[0])[0]
-        stroke_min_y=min(stroke, key=lambda x:x[1])[1]
-        optimized_region = {
-            "left": stroke_min_x,
-            "top": stroke_min_y,
-            "width": max(stroke, key=lambda x:x[0])[0]-stroke_min_x+1,
-            "height": max(stroke, key=lambda x:x[1])[1]-stroke_min_y+1
-        }
+        optimized_region = stroke_utils.bbox(stroke)
         sct_img = sct.grab(optimized_region)
         # Readapt the stroke to the smaller captured region
-        stroke = [(x-stroke_min_x, y-stroke_min_y) for x,y in stroke]
+        stroke = stroke_utils.transformed(stroke, 1, 1,
+                                          -optimized_region['left'],
+                                          -optimized_region['top'])
+        stroke = stroke_utils.connect(stroke)
         # Sample the screen shot
         stroke_len = len(stroke)
-        sampled_ramp = []
+        ramp = []
         for idx,p in enumerate(stroke):
-            sampled_ramp.append(ramp.ColorSample(idx, float(idx)/(stroke_len-1),
-                                sct_img.pixel(p[0], p[1])))
+            ramp.append(ramp_utils.ColorSample(idx, float(idx)/(stroke_len-1),
+                        sct_img.pixel(p[0], p[1])))
         # Blender has a limit of max. 32 color ramp entries
-        sampled_ramp = ramp.resample(sampled_ramp, 32)
+        ramp = ramp_utils.resample(ramp, 32)
         # Initialize the color ramp node
         ramp_elements = gradient_node.color_ramp.elements
         while len(ramp_elements)>1:
             ramp_elements.remove(ramp_elements[0])
         # Copy over the resampled gradient to the node
-        for index,sample in enumerate(sampled_ramp):
+        for index,sample in enumerate(ramp):
             pixel = sample.color
             if index>0:
                 ramp_elements.new(sample.t)
